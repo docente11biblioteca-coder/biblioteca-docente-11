@@ -422,10 +422,10 @@ body {
       <div class="sidebar-title">Biblioteca</div>
       <div class="sidebar-item active" onclick="goHome()">Inicio</div>
       <div class="sidebar-title">Carpetas</div>
-      <div class="sidebar-item" onclick="openFolder('Planchas')">📋 Planchas</div>
-      <div class="sidebar-item" onclick="openFolder('Rituales')">🕯️ Rituales</div>
-      <div class="sidebar-item" onclick="openFolder('Reglamentos')">📖 Reglamentos</div>
-      <div class="sidebar-item" onclick="openFolder('Libros')">📚 Libros</div>
+      <div class="sidebar-item" onclick="openFolder('planchas')">📋 Planchas</div>
+      <div class="sidebar-item" onclick="openFolder('rituales')">🕯️ Rituales</div>
+      <div class="sidebar-item" onclick="openFolder('reglamentos')">📖 Reglamentos</div>
+      <div class="sidebar-item" onclick="openFolder('libros')">📚 Libros</div>
     </div>
 
     <div class="main-content">
@@ -477,7 +477,13 @@ const credentials = {
 };
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDS31u64ap36TNgJzB2wnRxsoL_1ioifvdt8h382LQXBDCC5puitUQD20KFfKKy7eYTw/exec';
-const folders = ['Planchas', 'Rituales', 'Reglamentos', 'Libros'];
+const folders = ['planchas', 'rituales', 'reglamentos', 'libros'];
+const folderLabels = {
+  'planchas': 'Planchas',
+  'rituales': 'Rituales',
+  'reglamentos': 'Reglamentos',
+  'libros': 'Libros'
+};
 let currentUser = null;
 let currentFolder = null;
 let driveData = null;
@@ -523,7 +529,7 @@ async function goHome() {
     folders.map(f => `
       <div class="folder-card" onclick="openFolder('${f}')">
         <div class="folder-icon">📁</div>
-        <div class="folder-name">${f}</div>
+        <div class="folder-name">${folderLabels[f]}</div>
       </div>
     `).join('') +
   '</div>';
