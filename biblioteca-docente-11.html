@@ -476,9 +476,11 @@ const credentials = {
   maestro11: 'maestro'
 };
 
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDS31u64ap36TNgJzB2wnRxsoL_1ioifvdt8h382LQXBDCC5puitUQD20KFfKKy7eYTw/exec';
 const folders = ['Planchas', 'Rituales', 'Reglamentos', 'Libros'];
 let currentUser = null;
 let currentFolder = null;
+let driveData = null;
 
 function login() {
   const user = document.getElementById('user').value.trim();
@@ -510,9 +512,13 @@ function showLibrary() {
   document.getElementById('roleBadge').textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
 }
 
-function goHome() {
+async function goHome() {
   currentFolder = null;
   const content = document.getElementById('content');
+  content.innerHTML = '<div class="empty-state"><p>Cargando carpetas...</p></div>';
+  
+  await loadDriveData();
+  
   content.innerHTML = '<div class="folder-grid">' +
     folders.map(f => `
       <div class="folder-card" onclick="openFolder('${f}')">
@@ -523,7 +529,18 @@ function goHome() {
   '</div>';
 }
 
-function openFolder(folder) {
+async function loadDriveData() {
+  try {
+    const response = await fetch(APPS_SCRIPT_URL);
+    driveData = await response.json();
+    console.log('Datos de Drive cargados:', driveData);
+  } catch (error) {
+    console.error('Error al cargar datos de Drive:', error);
+    driveData = {};
+  }
+}
+
+async function openFolder(folder) {
   currentFolder = folder;
   const docs = getDocs(folder);
   const visibleDocs = docs.filter(d => canAccess(d.level));
@@ -533,15 +550,20 @@ function openFolder(folder) {
     <button class="back-btn" onclick="goHome()">← Volver</button>
     <button class="add-doc-btn" onclick="openAddDocModal('${folder}')">+ Agregar documento</button>
     <div class="doc-list">
-      ${visibleDocs.length > 0 ? visibleDocs.map(d => `
-        <div class="doc-card">
-          <div class="doc-info">
-            <h3>${d.title}</h3>
-            <p>${d.desc}</p>
+      ${visibleDocs.length > 0 ? visibleDocs.map(d => {
+        const isPdf = d.url.toLowerCase().endsWith('.pdf');
+        const isWord = d.url.toLowerCase().endsWith('.docx') || d.url.toLowerCase().endsWith('.doc');
+        const actionText = isPdf ? 'Ver' : 'Descargar';
+        return `
+          <div class="doc-card">
+            <div class="doc-info">
+              <h3>${d.title}</h3>
+              <p>${d.desc || 'Sin descripción'}</p>
+            </div>
+            <a href="${d.url}" target="_blank" rel="noopener" class="doc-link">${actionText}</a>
           </div>
-          <a href="${d.url}" target="_blank" class="doc-link">Abrir</a>
-        </div>
-      `).join('') : '<div class="empty-state"><p>Sin documentos</p></div>'}
+        `;
+      }).join('') : '<div class="empty-state"><p>Sin documentos en esta carpeta para tu nivel de acceso</p></div>'}
     </div>
   `;
 }
@@ -553,14 +575,40 @@ function canAccess(level) {
 }
 
 function getDocs(folder) {
-  const data = JSON.parse(localStorage.getItem('biblioteca') || '{}');
-  return data[folder] || [];
+  const docs = [];
+  
+  if (driveData && driveData[folder]) {
+    const folderData = driveData[folder];
+    for (const level of ['aprendiz', 'compañero', 'maestro']) {
+      if (folderData[level] && Array.isArray(folderData[level])) {
+        folderData[level].forEach(file => {
+          docs.push({
+            title: file.name,
+            desc: file.name.split('.')[0],
+            url: file.url,
+            level: level
+          });
+        });
+      }
+    }
+  }
+  
+  const additionalDocs = getAdditionalDocs(folder);
+  docs.push(...additionalDocs);
+  
+  return docs;
 }
 
-function saveDocs(folder, docs) {
-  const data = JSON.parse(localStorage.getItem('biblioteca') || '{}');
-  data[folder] = docs;
-  localStorage.setItem('biblioteca', JSON.stringify(data));
+function saveAdditionalDoc(folder, doc) {
+  const data = JSON.parse(localStorage.getItem('bibliotecarAdditional') || '{}');
+  if (!data[folder]) data[folder] = [];
+  data[folder].push(doc);
+  localStorage.setItem('bibliotecarAdditional', JSON.stringify(data));
+}
+
+function getAdditionalDocs(folder) {
+  const data = JSON.parse(localStorage.getItem('bibliotecarAdditional') || '{}');
+  return data[folder] || [];
 }
 
 function openAddDocModal(folder) {
@@ -584,9 +632,7 @@ function saveDocument() {
     return;
   }
 
-  const docs = getDocs(folder);
-  docs.push({ title, desc, url, level });
-  saveDocs(folder, docs);
+  saveAdditionalDoc(folder, { title, desc, url, level });
 
   closeModal();
   document.getElementById('docTitle').value = '';
